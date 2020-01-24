@@ -1,10 +1,14 @@
-import React from 'react'
+import React, { useState } from 'react'
+import Router from 'next/router'
+import firebase from '../firebase'
 import Layout from '../components/layout/Layout'
 import useValidacion from '../hooks/useValidacion'
 import {Formulario, Campo, InputSubmit, Error} from '../components/ui/Formulario'
 import validarCrearCuenta from '../validacion/validarCrearCuenta'
 
 const CrearCuenta = () => {
+
+  const [error, setError] = useState(false);
 
   const STATE_INICIAL = {
     nombre: '',
@@ -15,8 +19,14 @@ const CrearCuenta = () => {
   const {valores, errores, handleSubmit, handleChange, handleBlur} = useValidacion(STATE_INICIAL, validarCrearCuenta, crearCuenta);
   const {nombre, email, password} = valores;
 
-  function crearCuenta() {
-    console.log('creando cuenta');
+  async function crearCuenta() {
+    try {
+      await firebase.registrar(nombre, email, password);
+      Router.push('/');
+    } catch (error) {
+      console.error('Error: ', error.message)
+      setError(error.message);
+    }
   }
 
   return (
@@ -76,6 +86,7 @@ const CrearCuenta = () => {
             type="submit"
             value="Crear Cuenta"
           />
+          {error && <Error>{error}</Error>}
         </Formulario>
       </Layout>
     </div>
