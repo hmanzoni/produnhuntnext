@@ -23,6 +23,7 @@ const Logo = styled.p`
   font-weight: 700;
   font-family: 'Roboto Slap', serif;
   margin-right: 2rem;
+  cursor: pointer;
 `
 
 const Header = () => {
