@@ -87,7 +87,7 @@ const DetallesProducto = ({producto}) => {
                     <Imagen src={urlImg} />
                 </div>
                 <div>
-                    <Link href="/productos/#">
+                    <Link href="/productos/[id]" as={`/productos/${id}`}>
                         <Titulo>{nombre}</Titulo>
                     </Link>
                     <TextoDescripcion>{descripcion}</TextoDescripcion>
