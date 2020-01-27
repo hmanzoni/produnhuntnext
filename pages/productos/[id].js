@@ -33,6 +33,7 @@ const Productos = () => {
     const [producto, setProducto] = useState({});
     const [error, setError] = useState(false);
     const [comentario, setComentario] = useState({});
+    const [consultarDB, setConsultarDB] = useState(true);
 
     const router = useRouter();
     const {query: {id}} = router;
@@ -40,21 +41,23 @@ const Productos = () => {
     const { firebase, usuario } = useContext(FirebaseContext);
 
     useEffect(()=> {
-        if (id) {
+        if (id && consultarDB) {
             const obtenerProducto = async () => {
                 const productoQuery = await firebase.db.collection('productos').doc(id);
                 const producto = await productoQuery.get();
                 if (producto.exists) {
                     setProducto(producto.data());
+                    setConsultarDB(false);
                 } else {
                     setError(true);
+                    setConsultarDB(false);
                 }
             }
             obtenerProducto();
         }
-    }, [id, producto]);
+    }, [id]);
 
-    if(Object.keys(producto).length === 0) return 'Cargando...';
+    if(Object.keys(producto).length === 0 && !error) return 'Cargando...';
 
     const { nombre, empresa, url, urlImg, descripcion, votos, comentarios, creado, creador, haVotado } = producto;
 
@@ -67,13 +70,22 @@ const Productos = () => {
 
         const nuevoHaVotado = [...haVotado, usuario.uid];
 
-        firebase.db.collection('productos').doc(id).update({ votos: votoMas1, haVotado: nuevoHaVotado });
+        firebase.db.collection('productos').doc(id).update({ 
+            votos: votoMas1, 
+            haVotado: nuevoHaVotado 
+        });
 
         setProducto({
             ...producto,
             votos: votoMas1
-        })
+        });
+        
+        setConsultarDB(true);
     };
+
+    const esCreador = id => {
+        if (creador.id === id) return true;
+    }
 
     const handleChange = e => {
         setComentario({
@@ -81,6 +93,7 @@ const Productos = () => {
             [e.target.name] : e.target.value
         })
     }
+
     const handleSubmit = e => {
         e.preventDefault();
         if(!usuario) return router.push('/');
@@ -97,89 +110,115 @@ const Productos = () => {
             comentarios: nuevosComentarios
         });
 
+        setConsultarDB(true);
+
     }
+
+    const puedeBorrar = () => {
+        if (!usuario) return false;
+        if (creador.id === usuario.uid) return true;
+    }
+
+    const eliminaProd = async () => {
+        if (!usuario) return router.push('/login');
+        if (creador.id !== usuario.uid) return router.push('/');
+        try {
+            await firebase.db.collection('productos').doc(id).delete();
+            router.push('/');
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
     return (
         <Layout>
             <>
-                { error && <Error404 /> }
-                <h1 css={css`
-                    text-align: center;
-                    margin-top: 5rem;
-                `}>{nombre}</h1>
-                <ContenedorProducto>
-                    <div>
-                        <p>Publicado hace: { formatDistanceToNow ( new Date(creado), {locale : es} ) }</p>
-                        <p>Publicado por {creador.nombre} de {empresa} </p>
-                        <img src={urlImg} />
-                        <p>{descripcion}</p>
-                        { usuario && (
-                            <>
-                                <h2>Agrega tu comentario</h2>
-                                <form onSubmit={handleSubmit} >
-                                    <Campo>
-                                        <input 
-                                            type="text"
-                                            name="mensaje"
-                                            onChange={handleChange}
+            { error ? <Error404 /> : (
+                <div className="contenedor">
+                    <h1 css={css`
+                        text-align: center;
+                        margin-top: 5rem;
+                    `}>{nombre}</h1>
+                    <ContenedorProducto>
+                        <div>
+                            <p>Publicado hace: { formatDistanceToNow ( new Date(creado), {locale : es} ) }</p>
+                            <p>Publicado por {creador.nombre} de {empresa} </p>
+                            <img src={urlImg} />
+                            <p>{descripcion}</p>
+                            { usuario && (
+                                <>
+                                    <h2>Agrega tu comentario</h2>
+                                    <form onSubmit={handleSubmit} >
+                                        <Campo>
+                                            <input 
+                                                type="text"
+                                                name="mensaje"
+                                                onChange={handleChange}
+                                            />
+                                        </Campo>
+                                        <InputSubmit 
+                                            type="submit"
+                                            value="Agregar comentario"
                                         />
-                                    </Campo>
-                                    <InputSubmit 
-                                        type="submit"
-                                        value="Agregar comentario"
-                                    />
-                                </form>
-                            </>
-                        ) }
-                        <h2 css={css`
-                            margin-top: 3rem 0;
-                        `}>Comentario</h2>
-                        {comentarios.length === 0 ? "Aun no hay comentarios" : (
-                            <ul>
-                                {comentarios.map( (comentario, i) => (
-                                    <li
-                                        key={`${comentario.usuarioId}-${i}`}
-                                        css={css`
-                                            border: 1px solid #e1e1e1;
-                                            padding: 2rem;
-                                        `}
-                                    >
-                                        <p> {comentario.mensaje} </p>
-                                        <p>Escrito por: 
-                                            <span
-                                                css={css`
-                                                    font-weight:bold;
-                                                `}
-                                            >
-                                                {''} {comentario.usuarioNombre}
-                                            </span>
-                                        </p>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-                    <aside>
-                        <Boton 
-                            target="_blank"
-                            bgColor="true"
-                            href={url}
-                        >Visitar URL</Boton>
-                        <div
-                            css={css`
-                                margin-top: 5rem;
-                            `}
-                        >
-                        <p css={css`
-                            text-align: center;
-                        `}> {votos} Votos</p>
-                        { usuario && (
-                            <Boton
-                                onClick={votarProducto}
-                            >Votar</Boton>
-                        ) }
+                                    </form>
+                                </>
+                            ) }
+                            <h2 css={css`
+                                margin-top: 3rem 0;
+                            `}>Comentario</h2>
+                            {comentarios.length === 0 ? "Aun no hay comentarios" : (
+                                <ul>
+                                    {comentarios.map( (comentario, i) => (
+                                        <li
+                                            key={`${comentario.usuarioId}-${i}`}
+                                            css={css`
+                                                border: 1px solid #e1e1e1;
+                                                padding: 2rem;
+                                            `}
+                                        >
+                                            <p> {comentario.mensaje} </p>
+                                            <p>Escrito por: 
+                                                <span
+                                                    css={css`
+                                                        font-weight:bold;
+                                                    `}
+                                                >
+                                                    {''} {comentario.usuarioNombre}
+                                                </span>
+                                            </p>
+                                            { esCreador(comentario.usuarioId) && <CreadorProducto>Es creador</CreadorProducto> }
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </div>
-                    </aside>
-                </ContenedorProducto>
+                        <aside>
+                            <Boton 
+                                target="_blank"
+                                bgColor="true"
+                                href={url}
+                            >Visitar URL</Boton>
+                            <div
+                                css={css`
+                                    margin-top: 5rem;
+                                `}
+                            >
+                            <p css={css`
+                                text-align: center;
+                            `}> {votos} Votos</p>
+                            { usuario && (
+                                <Boton
+                                    onClick={votarProducto}
+                                >Votar</Boton>
+                            ) }
+                            </div>
+                        </aside>
+                    </ContenedorProducto>
+                    { puedeBorrar() && 
+                        <Boton onClick={eliminaProd}>Eliminar producto</Boton> 
+                    }
+                </div>
+            ) }
             </>
         </Layout>
     );
